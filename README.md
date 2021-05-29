@@ -106,6 +106,21 @@ Species Primary Maize Pests ( Sitophilus zeamais and Sitophilus oryzae ) 4531:37
 
 # Images
 
-![](Fish-clustering/Capture1.PNG)
-![](Fish-clustering/Capture2.PNG)
-![](Fish-clustering/Capture3.PNG)
+![Figure 1: Shows the silhouette plots of cytochrome B (CYTB) gene and cytochrome oxidase
+subunit 1 (COI) gene. N represents the number of sequences or samples. 1A) Shows the plot of
+CYTB gene where 259 samples have been placed into 8 clusters. The average width of the
+silhouette is 0.49. 1B) Shows the plot of COI gene where 143 samples have been placed into 8
+clusters. The average width of the silhouette is 0.67.](Fish-clustering/Capture1.PNG)
+
+![Figure 2: Represents the Internal Validation Graphs of COI gene produced by the “clValid()” function from R. Each graph shows 4
+lines and each of those lines represent a clustering method. The clustering methods that were inputted for validation are
+hierarchical, kmeans, pam and diana. The connections form due to values calculated from each number of clusters. 2A) shows the
+validation graph of Dunn index. 2b) shows the validation graph on the basis of connectivity. 2c) shows the validation graph of the
+silhouette index. ](Fish-clustering/Capture2.PNG)
+
+
+![Figure 2: Represents the Internal Validation Graphs of CYTB gene produced by the “clValid()” function from R. Each graph shows 4
+lines and each of those lines represent a clustering method. The clustering methods that were inputted for validation are
+hierarchical, kmeans, pam and diana. The plot points connections form due to values calculated from each number of clusters. 2A)
+shows the validation graph of Dunn index. 2b) shows the validation graph on the basis of connectivity. 2c) shows the validation
+graph of the silhouette index. ](Fish-clustering/Capture3.PNG)
