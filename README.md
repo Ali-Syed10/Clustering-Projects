@@ -107,3 +107,5 @@ Species Primary Maize Pests ( Sitophilus zeamais and Sitophilus oryzae ) 4531:37
 # Images
 
 ![](Fish-clustering/Capture1.PNG)
+![](Fish-clustering/Capture2.PNG)
+![](Fish-clustering/Capture3.PNG)
