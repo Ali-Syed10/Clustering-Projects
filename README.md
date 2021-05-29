@@ -1,5 +1,5 @@
 # Clustering-Projects
-Clustering on 16s rRNA and 23s rRNA bacterial sequences to find fundamental differences in biomarkers
+Clustering on COI and CYTB Salvelinus sequences to find fundamental differences in biomarkers
 
 # Introduction
 
