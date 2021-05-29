@@ -103,3 +103,7 @@ An answer to the debate 2:306–307.
 Ndong A, Thiaw C, Diallo B, Sarr M, Diome T, Kane M, Sembene M. 2015. Barcoding:
 Comparison of Variation Degree of COI and Cytochrome b Mitochondrial Markers in Two
 Species Primary Maize Pests ( Sitophilus zeamais and Sitophilus oryzae ) 4531:373–393
+
+# Images
+
+![](Fish-clustering/Capture1.PNG)
