@@ -1,0 +1,267 @@
+#### The first part of the assignment is to upload packages and if these packages are not installed then you can uncomment and install the packages by removing "#". 
+
+#install.packages(tidyverse) 
+library(tidyverse)
+#install.packages(BiocManager)
+library(BiocManager)
+#install.packages(Biostrings)
+library(Biostrings)
+#install.packages(DECIPHER)
+library(DECIPHER)
+#install.packages(rentrez)
+library(rentrez)
+#install.packages(seqinr)
+library(seqinr)
+#install.packages(ape)
+library(ape)
+#BiocManager::install("ggtree")
+library(clValid)
+
+#### In this project we have used genus Salvelinus which composes of trouts and belongs to the family Salmonidae. In this project we will compare two genes cytochrome oxidase subunit 1 (COI) and cytochrome B (CYTB). These genes were chosen because they are both present in the mitochondrial genome and code for proteins that are important for the mitochondrial functions. We will compare both genes in order to find out which gene is more suitable as genetic marker between the two. The current hypothesis proposed here is that COI1 gene will out perform CYTB gene given its status in the world of genetic markers. 
+
+#### First we have obtained the CYTB gene and assinged the data to the object "Salvelinus.CYTB.gene". The retmax value is set to 300 because otherwise the data set gets to large for functions to process and work with. Also we will keep the sample size same as it is easier to compare that way. 
+###MA EDIT 1: OBTAINING DATA MORE CONCISELY ----
+##MA 1: The reasoning behind a sample size of 300 is not well justified. I will fetch as many sequences as possible and then filter through them so the quality of data is increased. In the cytB gene there are 598 hits, there are only 146 hits in the COI genes. The sample sizes are quite different in this case. 
+##MA: The first change I will make is creating a function to create a search result, then fetch the data from the search result. A key change is the use_history = TRUE argument, this will allow the fetch to get all hits instead of just 300.  Once the sequences have been fetched, I am going to format the string into a data frame and add two columns of accession number and species name. The dataframe will be used in edit 2: filtering. 
+fetch_df <- function(searchterm, namefile) {
+  #searchterm = a character defining what search terms to use in the entrez database search
+  #namefile = the name of the fetched fasta file that will be written to the disk 
+  search_result <- entrez_search(db = "nuccore", term = searchterm)
+  #Re-do the search with adjusted `retmax`.
+  maxHits <- search_result$count
+  search_result <- entrez_search(db = "nuccore", term = searchterm, retmax = maxHits, use_history = TRUE)
+  #Fetch data
+  data_fetch <- entrez_fetch(db = "nuccore", web_history = search_result$web_history, rettype = "fasta")
+  write(data_fetch, namefile, sep = "\n")
+  # The fasta file that was written on the hard-drive is now read into the string set using readDNAStringSet function. 
+  inputstring <- readDNAStringSet(namefile, format = "fasta")
+  df <- data.frame(title = names(inputstring), nucleotides = paste(inputstring))
+  #Making a column called accession number containing the accession number and species name 
+  df$accession_number <- word(df$title, 1L, 3L)
+  df$species_name <- word(df$title, 2L, 3L)
+  return(df)
+  
+}
+
+#MA 1: Fetching CYTB data and creating a df
+dfCYTB <- fetch_df(searchterm = "(Salvelinus[ORGN] AND CYTB[Gene]) NOT (genome[TITL])", namefile = "Salvelinus_CYTB_fetch.fasta")
+
+#CHECKS:
+#MA 1: Verifying that the length is 598, meaning there is one unique accession number for each sequence
+length(unique(dfCYTB$accession_number))
+length(unique(dfCYTB$species_name))
+unique(dfCYTB$species_name)
+#MA 1: Looking that the species names that some are Salvelinus sp. I will removed these sequences later int he filtering step. 
+
+#MA 1: Fetching COI data and creating a df
+dfCOI <- fetch_df(searchterm = "(Salvelinus[ORGN] AND COI[Gene]) NOT (genome[TITL])", namefile = "Salvelinus_COI_fetch.fasta")
+
+#CHECKS:
+length(unique(dfCOI$accession_number))
+length(unique(dfCOI$species_name))
+unique(dfCOI$species_name)
+#MA 1: Looking that the species names that some are Salmoniformes sp. and Salvelinus sp. There are 598 sequences of CYTB genes and only 146 COI sequences. In order to make the numbers a little more even I will filter the datasets so that only species that are present in both dataframes will be kept.
+ 
+#MA 1: Without this improvement, not all samples for the CYTB would have been included in the analysis. Additionally the creation of the function decreases the number of lines needed to get both data frames from 40 to 20. 
+
+#### SYED: Considering that you cannot delete nucleotides that are bad at the end of the string or beginning of the sequences once the sequence has been put into string set format, there is not much quality control you can do. However, with this RemoveGaps function you can remove the gaps from the sequences. The processors argument has been set to NULL and this will allow the algorithm to decide what kind of processing it wants to do when removing the gaps. 
+
+#####MA EDIT2: FILTERING DATA AND PERFORMING DATA CHECKS -----
+#Adding code to filter the datasets and remove Ns from the string 
+#You can delete the N nucleotides from the strings if you convert them to character data first. Additionally there is a need to clean up the data prior to analysis. I will also filter out all of the Ns from the sequences. I will create a function to do this because it is many lines of code that must be repeated for both of the marker genes; CYTB and COI: 
+
+##MA 2: FILTERING THE SEQUENCES: 
+
+#MA 2: You can change the class of the sequences is now character so we can manipulate the number of Ns in the sequences. It is also worth it to filter out very short sequences. A histogram of DNA sequence length would be useful in this case. These lines were run to explore the distribution of sequence lengths within our data set 
+summary(str_count(dfCYTB$nucleotides))
+hist(str_count(dfCYTB$nucleotides))
+
+summary(str_count(dfCOI$nucleotides))
+hist(str_count(dfCOI$nucleotides))
+
+#MA 2: Looking at the histogram, we can see that there are quite a few sequences that are short. We have a very large sample so I think we should filter out sequences that are shorter than the first quartile. 
+
+#MA 2: FILTERING dfCYTB:
+#Remove all Ns from the sequences
+#Remove any sequences with undefined species names. 
+#Remove sequences that are shorter than the first quartile value (973)
+#Only keeping sequences in where the species is present in both dfCOI and dfCYTB:
+dfCYTB <- dfCYTB %>%
+  mutate(nucleotides = str_remove_all(nucleotides, "N|-")) %>%
+  filter(species_name != "Salvelinus sp.") %>%
+  filter(str_count(nucleotides) >= 973) %>%
+  filter(species_name %in% dfCOI$species_name)
+
+dim(dfCYTB)
+length(unique(dfCYTB$species_name))
+#MA 2: we can see that we filtered out over 200 sequences from the dataset. There are now 374 sequences belonging to 9 species. This removed 158 sequences from the dataframe, but there are still 442 sequences left that belong to 20 species.
+
+#MA 2: FILTERING dfCOI
+#Remove all Ns from the sequences
+#Remove any sequences with undefined species names. 
+#Remove sequences that are shorter than the first quartile value (652)
+#Only keeping sequences in where the species is present in both dfCOI and dfCYTB:
+dfCOI <- dfCOI %>%
+  mutate(nucleotides = str_remove_all(nucleotides, "N|-")) %>%
+  filter(species_name != "Salmoniformes sp." & species_name != "Salvelinus sp.") %>%
+  filter(str_count(nucleotides) >= 652) %>%
+  filter(species_name %in% dfCYTB$species_name)
+
+dim(dfCOI)
+unique(dfCOI$species_name)
+length(unique(dfCOI$species_name))
+#MA 2: There were 146 COI sequences to start, but now there are only 103 sequences left. There are also only 9 species present in both database. 
+
+#MA 2: Now I will pull the nucleotide sequences out of the dataframe and make them a DNAstringset with the accession number assigned as the name. 
+dfCOI$str_nucleotides <- DNAStringSet(dfCOI$nucleotides)
+names(dfCOI$str_nucleotides) <- dfCOI$accession_number 
+Salvelinus.String.COI1 <- DNAStringSet(dfCOI$str_nucleotides)
+class(Salvelinus.String.COI1)
+
+
+dfCYTB$str_nucleotides <- DNAStringSet(dfCYTB$nucleotides)
+names(dfCYTB$str_nucleotides) <- dfCYTB$accession_number 
+Salvelinus.String.CYTB <- DNAStringSet(dfCYTB$str_nucleotides)
+class(Salvelinus.String.CYTB)
+
+
+
+#####CYTB ALIGNMENT: ----
+Salvelinus.Remove.Gaps.CYTB <- RemoveGaps(Salvelinus.String.CYTB, removeGaps = "all", processors = NULL)
+
+#### Sometimes on or more of your sequences can be in a different orientation than the others and this can cause errors in your alignment. Thus OrientNucleotides function is used to correct the orientation of the sequences. Usually you would have a reference genome but if you don't it choose the first sequence as the reference and corrects the orientation of other sequences. 
+
+Salvelinus_CYTB.Oreint <- OrientNucleotides(Salvelinus.Remove.Gaps.CYTB)
+
+#### AlignSeqs function aligns the sequences. 
+
+Salvelinus.Align.CYTB <- AlignSeqs(Salvelinus_CYTB.Oreint, processors = NULL)
+
+#### Sometimes alignments can be off if the sequences are not the same size. This Adjustalignment function is used. It will add gaps to sequences and adjust their alignment so that all sequences match well. The first function removes the gaps from places that don't need to be there but this function adds it to the places that improves the alignment. 
+
+Salvelinus.Align.2 <- AdjustAlignment(Salvelinus.Align.CYTB)
+
+BrowseSeqs(Salvelinus.Align.2)
+
+?dist.alignment #### Looking up the documentation can show you why this function is used in comparison to others. It is a simple but an improved version of the Fitch,W.M (1966). It creates p-distances based on similarity. 
+
+#### The aligned sequenced was written in the fasta format. It is important because sequences are read in this format. 
+
+writeXStringSet(Salvelinus.Align.2, file = "Salvelinus.Align.CYTB.fasta")
+
+### The aligned sequence is read and assigned to object "Salvelinus.DNA.Align.CYTB". 
+
+Salvelinus.DNA.Align.CYTB <- read.alignment("Salvelinus.Align.CYTB.fasta", format = "fasta")
+
+class(Salvelinus.DNA.Align.CYTB) ### Class is alignment. 
+
+##### MA EDIT 3: changing dist.alignment to dist.dna and feeding the output into hclust.  
+
+#MA EDIT 3: When looking at documentation for this function, it says that the similarity method should be used for protein sequences, however, we are dealing with DNA sequences. It may be sufficient to use the dist.alignment function with the argument matrix = c("identity"). However, I think it would be more suitable to use the dist.dna function from the ape package to calculate pairwise distances. I will do that as follows:
+
+#MA 3: Make the alignment (DNAstringset) into a DNA bin 
+dnaBin.CYTB <- as.DNAbin(Salvelinus.Align.2)
+class(dnaBin.CYTB)
+
+#MA 3: Use the dist.dna function to calculate the pairwise distance between all the sequences. I am choosing k80 model because it takes into account the transversions and transitions. The pairwise deletion is set to true. 
+distanceCYTB <- dist.dna(dnaBin.CYTB, model = "K80", pairwise.deletion = TRUE)
+
+#MA 3: Check class of distanceCYTB to verify that it is dist class 
+class(distanceCYTB)
+
+#MA 3: So above we have calculated the pairwise distances between the sequences and they are stored in an object with class dist. Lines 229-235 will just convert the dist object into a matrix and recalculate a distance object, but using a different method. I think these lines should be cut out and the distanceCYTB can be used as the input argument for hclust. 
+#####CYTB DUNN INDEX: ----
+
+Dunn.Cluster.CYTB <- hclust(distanceCYTB, method = "average")
+
+class(Dunn.Cluster.CYTB)
+
+#MA minor: changed this from 8 to 9 because there are 9 species in our analysis
+nc <- 9 #number of clusters 
+
+Dunn.Cluster.CYTB <- cutree(Dunn.Cluster.CYTB, nc)
+#MA minor: replaced Dunn.dist.CYTB with distanceCYTB
+dunn(distanceCYTB, Dunn.Cluster.CYTB)
+
+#####COI ALIGNMENT: ----
+BrowseSeqs(Salvelinus.String.COI1)
+
+Salvelinus.Remove.Gaps <- RemoveGaps(Salvelinus.String.COI1, removeGaps = "all", processors = NULL)
+
+class(Salvelinus.Remove.Gaps)
+
+Salvelinus_COI.Oreint <- OrientNucleotides(Salvelinus.Remove.Gaps)
+
+Salvelinus.Align <- AlignSeqs(Salvelinus_COI.Oreint, processors = NULL)
+
+Salvelinus.Align.1 <- AdjustAlignment(Salvelinus.Align)
+
+BrowseSeqs(Salvelinus.Align.1)
+
+?dist.alignment
+
+writeXStringSet(Salvelinus.Align.1, file = "Salvelinus.Align.fasta")
+
+Salvelinus.DNA.Align <- read.alignment("Salvelinus.Align.fasta", format = "fasta")
+
+#MA 3: Again, make the alignment (DNAstringset) into a DNA bin 
+dnaBin.COI <- as.DNAbin(Salvelinus.Align.1)
+class(dnaBin.COI)
+
+#MA 3:I am choosing k80 model because it takes into account the transversions and transitions 
+distanceCOI <- dist.dna(dnaBin.COI, model = "K80", pairwise.deletion = TRUE)
+
+#MA 3: Check class of distanceCYTB to verify that it is dist class 
+class(distanceCOI)
+
+#MA minor: change the name of this variable so it is not repeated int he script. It was previously named Dunn.Cluster.COI and then got over-written by line 229
+Dunn.hclust.COI <- hclust(distanceCOI, method = "average")
+
+class(Dunn.hclust.COI)
+
+#MA minor: Change clusters from 8 to 9 to reflect the number of species included in this analysis
+nc <- 9 #number of clusters is set to 8. Lower than this causes clusters to overlap with each other and makes readability difficult. 
+
+#### The cuttree function is used to cut the tree fromed by hclutst() and form multile groups. 
+
+Dunn.Cluster.COI <- cutree(Dunn.hclust.COI, nc)
+
+class(Dunn.Cluster.COI)
+
+#### The dunn() function calculated the dunn index. The value is between 0 to infinity and higher the value means the better the clusters formed and thus provides evidence that the gene can be used as a potential marker.
+
+dunn(distanceCOI, Dunn.Cluster.COI)
+
+##### SILHOUETTE PLOTS: -----
+#### Here I have calculate the silhoutte index and plotted them for COI5P gene and CYTB gene. As I mentioned previously before 8 clusters were set to be created. The plot gives an indication of how good of quality each cluster is and tells the overall index as well. This a good way to visualize the clusters and also see if any sequences or data is not fitting the clusters. Normally values are 0 - 1. However if cluster is too different and not fit the grouping it will be represented in negative value. 
+
+#MA minor: Updated the second argument to reflect the dist created above. 
+plot(silhouette(Dunn.Cluster.CYTB, distanceCYTB), col = 1:9, border = NA, main = "Silhouette Plot for the Hierarchial Clusters Produced for CYTB gene")
+
+#MA minor: Updated the second argument to reflect the dist created above. 
+plot(silhouette(Dunn.Cluster.COI, distanceCOI), col = 1:9, border = NA, main = "Silhouette Plot for the Hierarchial Clusters Produced for COI gene")
+?silhouette
+#####CLUSTER VALIDATION: ----
+#### Finally we will use clValid function. First is for COI. This function will take into account each of the clustering methods set and give a score. It will also take into account how many clusters are there. So for example if the number of clusters is 2 then it will give a score for each clustering method. I have used hierarchial, kmean, pam and diana clustering. Why? because it will allow me to compare agglomerative with divisive clustering methods and explore the difference in values. Pam and diana are divise clustering methods, while hierarchial and kmean are agglomerative. I have also plotted the index values for each clustering method and clusters. The indexes are dunn and silhouette(). The clValid function plot will generate three plots. Each for connectivity, Dunn index and Silhouette index. Ideally you would want to have connectivity minimized, Dunn index and Silhouette index value maximized.  
+
+Dunn.COI.1 <- as.matrix(distanceCOI)
+Dunn.COI.valid <- clValid(Dunn.COI.1, 2:9, clMethods = c("hierarchical","kmeans","pam", "diana"),validation = "internal")
+
+class(Dunn.COI.valid)
+
+summary(Dunn.COI.valid)
+
+plot(Dunn.COI.valid, main = "Internal Validation Graphs for COI gene") #To view the plots the R will ask you to hit enter in the console. 3 plot are generated and you can view them one by one. 
+
+#### Here we will use clValid function for CYTB gene.Same steps are repeated.  
+
+dfdistanceCYTB <- as.matrix(distanceCYTB)
+Dunn.CYTB.valid <- clValid(dfdistanceCYTB, 2:9, clMethods = c("hierarchical","kmeans","pam", "diana"),validation = "internal")
+
+class(Dunn.CYTB.valid)
+
+summary(Dunn.CYTB.valid)
+
+plot(Dunn.CYTB.valid, main = "Internal Validation Graphs for CYTB gene") #To view the plots the R will ask you to hit enter in the console. 3 plot are generated and you can view them one by one. 
+
+#### The results lead to a conclusion that COI gene is much more better performing that CYTB gene and thus COI genetic marker should be the marker of choice. The dunn index and average silhouette width of CYTB gene is significantly much lower than COI gene. The validation graphs reveal that as number of clusters rise the COI gene fails farily quickly to distinct and place them in groups while the COI gene does not. This shows that CYTB gene does not have the capacity to dicriminate between species further while the COI gene can. 
